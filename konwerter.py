@@ -6,11 +6,21 @@ import dateparser
 import requests
 import json
 import readline  # only seemingly unused -- this changes flush behavior
+import argparse
+import csv
+
 from babel.dates import format_date
 
 available_currencies =\
     ["USD", "AUD", "HKD", "CAD", "NZD", "SGD", "EUR", "HUF", "CHF", "GBP", "UAH",
      "JPY", "CZK", "DKK", "ISK", "NOK", "SEK", "HRK", "RON", "BGN", "RUB", "CNY"]
+
+parser = argparse.ArgumentParser(description="Zamienia waluty na złotówki,"
+                                             "zgodnie z kursem NBP.")
+parser.add_argument("csv_file", nargs='?',
+                    help="nazwa pliku CSV z kolumnami: data; przychód; waluta",
+                    type=str)
+args = parser.parse_args()
 
 
 def get_rate(currency, date):
@@ -55,11 +65,28 @@ def test_non_business_day():
 def test_other_currency():
     assert get_rate("CHF", datetime.date(2016, 9, 9))[0] == 3.9444
 
+income_pln = dict((cur, 0.) for cur in available_currencies)
+
+
+def add_income(value, currency, date):
+    rate, bill_date = get_rate(currency, date - datetime.timedelta(1))
+    print("Dodaje %d %s po kursie z %d.%d.%d (ostatni dzień roboczy przed)" %
+          (value, currency, bill_date.day, bill_date.month,
+              bill_date.year))
+    income_pln[currency] += rate * value
+
 
 def main():
-    income_pln = dict((cur, 0.) for cur in available_currencies)
     default_currency = "USD"
     while True:
+        if args.csv_file is not None:
+            with open(args.csv_file, 'rb') as csv_file:
+                reader = csv.reader(csv_file, delimiter=';')
+                for date, value, currency in reader:
+                    add_income(float(value),
+                               ''.join(filter(str.isalpha,currency)),
+                               dateparser.parse(date))
+            break
         print("Suma przychodów: %f PLN." % sum(income_pln.values()))
         print("Podaj kolejną datę przychodu lub x aby zakończyć")
         date_str = raw_input()
@@ -88,15 +115,11 @@ def main():
 
         try:
             value = float(''.join(c for c in value_str if not str.isalpha(c)))
-            rate, bill_date = get_rate(currency, date - datetime.timedelta(1))
+            add_income(value, currency, date)
         except Exception as e:
             print(e)
             continue
 
-        print("Dodaje %d %s po kursie z %d.%d.%d (ostatni dzień roboczy przed)" %
-              (value, currency, bill_date.day, bill_date.month,
-                  bill_date.year))
-        income_pln[currency] += rate * value
     print("Łączny przychód: %f PLN, w tym:" % sum(income_pln.values()))
     for cur, value in income_pln.iteritems():
         if abs(value) > 1e-3:
