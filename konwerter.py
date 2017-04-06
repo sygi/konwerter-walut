@@ -40,7 +40,8 @@ def get_rate(currency, date):
 
         response = requests.get(url)
         status = response.status_code
-        date = date - datetime.timedelta(1)
+        if status is not 200:
+            date = date - datetime.timedelta(1)
 
     tree = json.loads(response.content)
     assert len(tree['rates']) == 1
@@ -84,7 +85,7 @@ def main():
                 reader = csv.reader(csv_file, delimiter=';')
                 for date, value, currency in reader:
                     add_income(float(value),
-                               ''.join(filter(str.isalpha,currency)),
+                               ''.join(filter(str.isalpha, currency)),
                                dateparser.parse(date))
             break
         print("Suma przychodów: %f PLN." % sum(income_pln.values()))
