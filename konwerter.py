@@ -1,4 +1,4 @@
-#! /usr/bin/python
+#! /usr/bin/env python
 # -*- coding: utf-8 -*-
 from __future__ import print_function
 import datetime
@@ -8,8 +8,11 @@ import json
 import readline  # only seemingly unused -- this changes flush behavior
 import argparse
 import csv
+import six
+
 
 from babel.dates import format_date
+from six.moves import input
 
 available_currencies =\
     ["USD", "AUD", "HKD", "CAD", "NZD", "SGD", "EUR", "HUF", "CHF", "GBP", "UAH",
@@ -43,7 +46,7 @@ def get_rate(currency, date):
         if status is not 200:
             date = date - datetime.timedelta(1)
 
-    tree = json.loads(response.content)
+    tree = response.json()
     assert len(tree['rates']) == 1
     print_rate_info(tree['rates'])
     return (tree['rates'][0]['mid'], date)
@@ -71,7 +74,7 @@ income_pln = dict((cur, 0.) for cur in available_currencies)
 
 def add_income(value, currency, date):
     rate, bill_date = get_rate(currency, date - datetime.timedelta(1))
-    print("Dodaje %d %s po kursie z %d.%d.%d (ostatni dzień roboczy przed)" %
+    print("Dodaje %.2f %s po kursie z %d.%d.%d (ostatni dzień roboczy przed)" %
           (value, currency, bill_date.day, bill_date.month,
               bill_date.year))
     income_pln[currency] += rate * value
@@ -81,7 +84,7 @@ def main():
     default_currency = "USD"
     while True:
         if args.csv_file is not None:
-            with open(args.csv_file, 'rb') as csv_file:
+            with open(args.csv_file, 'r') as csv_file:
                 reader = csv.reader(csv_file, delimiter=';')
                 for date, value, currency in reader:
                     add_income(float(value),
@@ -90,7 +93,7 @@ def main():
             break
         print("Suma przychodów: %f PLN." % sum(income_pln.values()))
         print("Podaj kolejną datę przychodu lub x aby zakończyć")
-        date_str = raw_input()
+        date_str = input()
         if date_str.lower() == 'x':
             break
         date = dateparser.parse(date_str)
@@ -101,7 +104,7 @@ def main():
 
         print("Podaj kwote przychodu razem z walutą (domyślna: %s) lub x"
               " aby poprawić datę" % default_currency)
-        value_str = raw_input()
+        value_str = input()
         if value_str.lower() == 'x':
             continue
         currency = ''.join(filter(str.isalpha, value_str))
@@ -122,7 +125,7 @@ def main():
             continue
 
     print("Łączny przychód: %f PLN, w tym:" % sum(income_pln.values()))
-    for cur, value in income_pln.iteritems():
+    for cur, value in six.iteritems(income_pln):
         if abs(value) > 1e-3:
             print("%f in %s" % (value, cur))
 
