@@ -34,13 +34,13 @@ def get_rate(currency, date):
         before and the date for which the rate was taken
     """
     status = 400
-    while status is not 200:
+    while status != 200:
         url = ("http://api.nbp.pl/api/exchangerates/rates/A/%s/%d-%02d-%02d?format=json" %
               (currency, date.year, date.month, date.day))
 
         response = requests.get(url)
         status = response.status_code
-        if status is not 200:
+        if status != 200:
             date = date - datetime.timedelta(1)
 
     tree = json.loads(response.content)
@@ -71,7 +71,7 @@ income_pln = dict((cur, 0.) for cur in available_currencies)
 
 def add_income(value, currency, date):
     rate, bill_date = get_rate(currency, date - datetime.timedelta(1))
-    print("Dodaje %d %s po kursie z %d.%d.%d (ostatni dzień roboczy przed)" %
+    print("Dodaje %f %s po kursie z %d.%d.%d (ostatni dzień roboczy przed)" %
           (value, currency, bill_date.day, bill_date.month,
               bill_date.year))
     income_pln[currency] += rate * value
@@ -79,21 +79,22 @@ def add_income(value, currency, date):
 
 def main():
     default_currency = "USD"
+    date_format = "%Y%m%d"
     while True:
         if args.csv_file is not None:
-            with open(args.csv_file, 'rb') as csv_file:
+            with open(args.csv_file, 'r') as csv_file:
                 reader = csv.reader(csv_file, delimiter=';')
                 for date, value, currency in reader:
                     add_income(float(value),
                                ''.join(filter(str.isalpha, currency)),
-                               dateparser.parse(date))
+                               dateparser.parse(date, [date_format]))
             break
         print("Suma przychodów: %f PLN." % sum(income_pln.values()))
         print("Podaj kolejną datę przychodu lub x aby zakończyć")
-        date_str = raw_input()
+        date_str = input()
         if date_str.lower() == 'x':
             break
-        date = dateparser.parse(date_str)
+        date = dateparser.parse(date_str, [date_format])
         if date is None:
             print("Niezrozumiały format daty")
             continue
@@ -101,7 +102,7 @@ def main():
 
         print("Podaj kwote przychodu razem z walutą (domyślna: %s) lub x"
               " aby poprawić datę" % default_currency)
-        value_str = raw_input()
+        value_str = input()
         if value_str.lower() == 'x':
             continue
         currency = ''.join(filter(str.isalpha, value_str))
@@ -122,7 +123,7 @@ def main():
             continue
 
     print("Łączny przychód: %f PLN, w tym:" % sum(income_pln.values()))
-    for cur, value in income_pln.iteritems():
+    for cur, value in income_pln.items():
         if abs(value) > 1e-3:
             print("%f in %s" % (value, cur))
 
